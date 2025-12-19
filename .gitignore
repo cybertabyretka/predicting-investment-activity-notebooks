@@ -11,9 +11,11 @@ model_training
 Data
 !Data/README.md
 
+Notebooks/GRU
 !Notebooks/GRU/russian-investment-activity-gru.ipynb
 
 !Notebooks/LSTM/russian-investment-activity-lstm.ipynb
 
+Notebooks/Transformer
 !Notebooks/Transformer/russian-investment-activity-transformer.ipynb
 
