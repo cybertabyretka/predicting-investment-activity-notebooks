@@ -23,3 +23,5 @@ Notebooks/FeedforwardMLP
 Notebooks/Transformer
 !Notebooks/Transformer/russian-investment-activity-transformer.ipynb
 
+Notebooks/Predict
+!Notebooks/Predict/Tuning.ipynb
