@@ -1,203 +1,203 @@
 # ARTransformerForecaster
 
-## Описание
+## Description
 
-**ARTransformerForecaster** — это авто-регрессивная модель на базе Transformer Encoder для прогнозирования инвестиционных показателей по регионам России на несколько лет вперёд.  
-Модель использует архитектуру Transformer для извлечения контекстных представлений временных рядов и отдельный авто-регрессивный декодер, который пошагово генерирует прогноз на заданный горизонт.
+**ARTransformerForecaster** is an autoregressive Transformer Encoder-based model for forecasting investment indicators across Russian regions for multiple years ahead.  
+The model uses a Transformer architecture to extract contextual representations of time series and a separate autoregressive decoder that generates forecasts step by step over a given horizon.
 
-Модель поддерживает:
-- синусоидальные и обучаемые позиционные кодировки,
-- региональные эмбеддинги,
-- несколько стратегий пуллинга контекста,
+The model supports:
+- sinusoidal and learnable positional encodings,
+- regional embeddings,
+- multiple context pooling strategies,
 - teacher forcing,
-- устойчивое обучение за счёт Huber loss, dropout, шума на входе и gradient clipping,
-- интеграцию с Optuna для подбора гиперпараметров.
+- robust training with Huber loss, dropout, input noise, and gradient clipping,
+- integration with Optuna for hyperparameter tuning.
 
 ---
 
-## Архитектура
+## Architecture
 
-### Входные данные
+### Input Data
 
-Входной тензор `x` имеет размер:
+The input tensor `x` has shape:
 
 - `[batch_size, seq_len, n_features]`
 
-где:
-- `seq_len` — длина исторического окна,
-- `n_features` — количество признаков на временной шаг.
+where:
+- `seq_len` — length of the historical window,
+- `n_features` — number of features per time step.
 
-### Региональные эмбеддинги (опционально)
+### Regional Embeddings (optional)
 
-Если `region_emb_size > 0`, используется слой `nn.Embedding`, который кодирует регион в плотный вектор.  
-Региональный эмбеддинг конкатенируется с входными признаками **на каждом временном шаге**.
+If `region_emb_size > 0`, an `nn.Embedding` layer is used to encode the region into a dense vector.  
+The regional embedding is concatenated with input features **at each time step**.
 
-Это позволяет модели учитывать устойчивые структурные различия между регионами (экономика, демография, инфраструктура и т.д.).
+This allows the model to account for stable structural differences between regions (economy, demographics, infrastructure, etc.).
 
 ---
 
-### Проекция входа
+### Input Projection
 
-После объединения признаков используется линейная проекция:
+After combining features, a linear projection is applied:
 
 - `Linear(n_features + region_emb_size → d_model)`
 
-Она приводит вход к размерности `d_model`, используемой внутри Transformer.
+It maps the input to the `d_model` dimensionality used inside the Transformer.
 
-Дополнительно могут применяться:
-- dropout на входе (`input_dropout`),
-- гауссов шум (`input_noise_std`) во время обучения.
+Additionally, the following may be applied:
+- input dropout (`input_dropout`),
+- Gaussian noise (`input_noise_std`) during training.
 
 ---
 
-### Позиционное кодирование
+### Positional Encoding
 
-Используется модуль `PositionalEncodingFlexible`, поддерживающий два режима:
+The `PositionalEncodingFlexible` module supports two modes:
 
-- `sin` — классическое синусоидальное позиционное кодирование,
-- `learned` — обучаемые позиционные эмбеддинги.
+- `sin` — classical sinusoidal positional encoding,
+- `learned` — learnable positional embeddings.
 
-Позиционное кодирование добавляется к входным эмбеддингам перед подачей в Transformer Encoder.
+Positional encoding is added to input embeddings before feeding into the Transformer Encoder.
 
 ---
 
 ### Transformer Encoder
 
-Энкодер построен на `nn.TransformerEncoder` и состоит из:
+The encoder is built on `nn.TransformerEncoder` and consists of:
 
-- `num_layers` Encoder-блоков,
+- `num_layers` encoder blocks,
 - multi-head self-attention (`nhead`),
-- feed-forward слоёв размерности `dim_feedforward`,
-- residual connections и LayerNorm.
+- feed-forward layers of size `dim_feedforward`,
+- residual connections and LayerNorm.
 
-Энкодер обрабатывает всю временную последовательность и возвращает тензор:
+The encoder processes the entire sequence and returns a tensor:
 
 - `[batch_size, seq_len, d_model]`
 
 ---
 
-### Пуллинг контекста
+### Context Pooling
 
-Для перехода от последовательности к фиксированному контекстному вектору используется один из вариантов пуллинга:
+To convert the sequence into a fixed-size context vector, one of the pooling options is used:
 
 #### `last_mean`
-Конкатенация:
-- последнего временного шага энкодера,
-- среднего значения по временной оси.
+Concatenates:
+- the last time step of the encoder,
+- the mean across the time axis.
 
 #### `attn`
-Обучаемый attention-пуллинг:
-- вычисляются веса внимания по временным шагам,
-- формируется взвешенная сумма выходов энкодера,
-- результат конкатенируется с последним шагом.
+Learnable attention pooling:
+- attention weights are computed across time steps,
+- a weighted sum of encoder outputs is formed,
+- the result is concatenated with the last step.
 
-Итоговый контекст имеет размер:
+The resulting context has dimension:
 - `ctx_dim = 2 * d_model`
 
-Опционально применяется `LayerNorm`.
+LayerNorm can be optionally applied.
 
 ---
 
-## Авто-регрессивный декодер
+## Autoregressive Decoder
 
-Декодер реализован как **пошаговый MLP**, а не Transformer Decoder.
+The decoder is implemented as a **stepwise MLP**, not a Transformer Decoder.
 
-### Инициализация
+### Initialization
 
-Первое значение (`prev`) определяется:
-- либо через `start_proj(ctx)`,
-- либо через `y_last`, если передано последнее реальное значение.
+The first value (`prev`) is determined:
+- either via `start_proj(ctx)`,
+- or using `y_last` if the last real value is provided.
 
 ---
 
-### Embedding шага прогноза
+### Forecast Step Embedding
 
-Для каждого шага горизонта используется embedding номера шага:
+For each step of the horizon, a step embedding is used:
 
 - `nn.Embedding(horizon, step_emb_dim)`
 
-Это позволяет декодеру различать ранние и дальние прогнозы.
+This allows the decoder to distinguish between near and distant forecasts.
 
 ---
 
-### Один шаг декодера
+### Single Decoder Step
 
-На каждом шаге `t` формируется вход:
+At each step `t`, the input is formed as:
 
 - `[ctx, prev, step_embedding(t)]`
 
-Далее применяется:
+Then applied:
 - Linear → GELU → Dropout → LayerNorm → Linear
 
-На выходе получается одно скалярное значение прогноза.
+The output is a single scalar forecast.
 
 ---
 
-### Auto-regressive loop
+### Auto-regressive Loop
 
-Прогноз строится последовательно:
-- выход шага `t` используется как вход `prev` для шага `t+1`,
-- поддерживается teacher forcing с вероятностью `teacher_forcing_prob`.
+Forecasts are generated sequentially:
+- the output of step `t` is used as input `prev` for step `t+1`,
+- teacher forcing is supported with probability `teacher_forcing_prob`.
 
-Выход модели:
+Model output:
 - `[batch_size, horizon]`
 
 ---
 
-## Инициализация весов
+## Weight Initialization
 
-Используется единый подход:
+A unified approach is used:
 
 - `Linear` — Xavier Uniform
-- `LayerNorm` — веса = 1, bias = 0
+- `LayerNorm` — weight = 1, bias = 0
 - `Embedding` — Normal(mean=0, std=0.02)
 
 ---
 
-## Основные гиперпараметры
+## Key Hyperparameters
 
-| Параметр | Описание |
+| Parameter | Description |
 |--------|---------|
-| n_features | Количество входных признаков |
-| horizon | Длина горизонта прогноза |
-| d_model | Размерность внутреннего представления |
-| nhead | Количество голов self-attention |
-| num_layers | Число слоёв Transformer Encoder |
-| dim_feedforward | Размер FFN в Encoder |
-| dropout | Dropout в Encoder и Decoder |
-| pos_type | Тип позиционного кодирования (`sin`, `learned`) |
-| pool_type | Тип пуллинга контекста |
-| region_emb_size | Размер регионального эмбеддинга |
-| input_dropout | Dropout на входе |
-| input_noise_std | Шум на входе |
-| teacher_forcing_prob | Вероятность teacher forcing |
-| grad_clip | Усечение градиентов |
+| n_features | Number of input features |
+| horizon | Forecast horizon length |
+| d_model | Dimensionality of internal representations |
+| nhead | Number of self-attention heads |
+| num_layers | Number of Transformer Encoder layers |
+| dim_feedforward | Size of FFN in Encoder |
+| dropout | Dropout in Encoder and Decoder |
+| pos_type | Positional encoding type (`sin`, `learned`) |
+| pool_type | Context pooling type |
+| region_emb_size | Size of regional embedding |
+| input_dropout | Input dropout |
+| input_noise_std | Input noise standard deviation |
+| teacher_forcing_prob | Probability of teacher forcing |
+| grad_clip | Gradient clipping |
 
 ---
 
-## Обучение
+## Training
 
-Обучение модели поддерживает:
+The model supports training with:
 
-- Оптимизаторы: Adam, AdamW, RMSProp
-- Функции потерь: MSE, MAE, Huber
+- Optimizers: Adam, AdamW, RMSProp
+- Loss functions: MSE, MAE, Huber
 - LR Scheduler: StepLR, CosineAnnealing, OneCycle
 - Gradient clipping
 - Mixed Precision (AMP)
 - Early stopping
-- Полную интеграцию с Optuna
+- Full Optuna integration
 
-Валидация производится на полном горизонте прогноза.
+Validation is performed over the entire forecast horizon.
 
 ---
 
-## Особенности модели
+## Model Features
 
-- Transformer эффективно захватывает долгосрочные зависимости.
-- Отдельный AR-декодер стабилен и проще классического Transformer Decoder.
-- Региональные эмбеддинги повышают качество пространственных прогнозов.
-- Step embeddings помогают разделять ближний и дальний прогноз.
-- Архитектура хорошо подходит для долгосрочного экономического прогнозирования.
-- Гибко масштабируется под различные размеры данных и горизонты.
+- Transformer effectively captures long-term dependencies.
+- Separate AR-decoder is more stable and simpler than a classic Transformer Decoder.
+- Regional embeddings improve spatial forecast quality.
+- Step embeddings help differentiate near and far forecasts.
+- Architecture is suitable for long-term economic forecasting.
+- Scales flexibly to different dataset sizes and horizons.
 
 ---

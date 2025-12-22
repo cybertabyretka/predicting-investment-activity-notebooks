@@ -1,50 +1,50 @@
 # FeedForwardAR
 
-## Описание
+## Description
 
-**FeedForwardAR** — это полносвязная нейронная сеть (Feed-Forward Neural Network) для предсказания инвестиционных показателей по регионам России на основе исторических временных рядов.  
-Модель работает как авто-регрессивная (AR), используя значения нескольких предыдущих временных шагов для предсказания будущих значений.
-
----
-
-## Архитектура
-
-Основные характеристики модели:
-
-- **Входные данные**:  
-  Входной тензор `x` имеет размер `[batch_size, seq_len, n_features]`, где:
-  - `seq_len` — длина временного окна (количество прошлых шагов для анализа),
-  - `n_features` — количество признаков на каждый шаг.
-
-- **Региональные эмбеддинги (опционально)**:  
-  Если задан `region_emb_size > 0`, используется слой `nn.Embedding` для кодирования регионов в вектор фиксированной размерности.  
-  Эти эмбеддинги конкатенируются с временными признаками перед подачей в сеть.
-
-- **Полносвязные слои (Feed-Forward)**:  
-  Сеть состоит из последовательности слоев `Linear -> ReLU -> Dropout`. Размеры скрытых слоев задаются через параметр `hidden_sizes`.
-
-- **Выходной слой**:  
-  Линейный слой, выдающий предсказания на `horizon` будущих шагов.
-
-- **Инициализация весов**:  
-  Используется метод **Xavier Uniform** для весов и нули для смещений.
+**FeedForwardAR** is a fully connected neural network (Feed-Forward Neural Network) for predicting investment indicators across regions of Russia based on historical time series.  
+The model operates in an autoregressive (AR) manner, using values from several previous time steps to predict future values.
 
 ---
 
-## Использование
+## Architecture
 
-Пример создания модели и проверки количества параметров:
+Key characteristics of the model:
+
+- **Input data**:  
+  The input tensor `x` has shape `[batch_size, seq_len, n_features]`, where:
+  - `seq_len` is the length of the time window (number of past steps used for analysis),
+  - `n_features` is the number of features per step.
+
+- **Regional embeddings (optional)**:  
+  If `region_emb_size > 0` is specified, an `nn.Embedding` layer is used to encode regions into fixed-size vectors.  
+  These embeddings are concatenated with the time features before being fed into the network.
+
+- **Fully connected layers (Feed-Forward)**:  
+  The network consists of a sequence of `Linear -> ReLU -> Dropout` layers. Hidden layer sizes are defined via the `hidden_sizes` parameter.
+
+- **Output layer**:  
+  A linear layer that produces predictions for `horizon` future steps.
+
+- **Weight initialization**:  
+  **Xavier Uniform** initialization is used for weights, and biases are initialized to zeros.
+
+---
+
+## Usage
+
+Example of creating the model and checking the number of parameters:
 
 ```python
 import torch
 from torch import nn
 from torch.nn import init
 
-# Создание модели
+# Create the model
 test_model = FeedForwardAR(n_features=78, seq_len=4, horizon=3)
 print(test_model)
 
-# Подсчет параметров
+# Count parameters
 total_params = sum(p.numel() for p in test_model.parameters())
 trainable_params = sum(p.numel() for p in test_model.parameters() if p.requires_grad)
 
@@ -53,39 +53,39 @@ print(f"Trainable parameters: {trainable_params}")
 ```
 ---
 
-## Настройки гиперпараметров
+## Hyperparameter Settings
 
-Модель поддерживает следующие основные параметры:
+The model supports the following main parameters:
 
-| Параметр | Описание |
-|----------|----------|
-| `n_features` | Количество признаков на шаг |
-| `seq_len` | Длина временного окна |
-| `horizon` | Количество шагов для предсказания |
-| `hidden_sizes` | Размеры скрытых слоев |
-| `dropout` | Доля отключаемых нейронов |
-| `region_emb_size` | Размер регионального эмбеддинга |
-
----
-
-## Обучение
-
-Обучение модели реализуется с помощью стандартного цикла PyTorch, с возможностью настройки:
-
-- Оптимизатора (`Adam`, `AdamW`, `RMSProp`)
-- Темпа обучения (`lr`)
-- L2-регуляризации (`weight_decay`)
-- Дропаут
-- Усечения градиентов (`grad_clip`)
-- Типа функции потерь: `MSE`, `MAE`, `Huber`
+| Parameter | Description |
+|-----------|-------------|
+| `n_features` | Number of features per step |
+| `seq_len` | Length of the time window |
+| `horizon` | Number of steps to predict |
+| `hidden_sizes` | Sizes of hidden layers |
+| `dropout` | Dropout rate |
+| `region_emb_size` | Size of the regional embedding |
 
 ---
 
-## Особенности
+## Training
 
-- Простая и быстрая в обучении архитектура.
-- Подходит для небольших временных рядов.
-- Поддержка региональных эмбеддингов.
-- Легко интегрируется с автоматизированными процедурами подбора гиперпараметров (например, Optuna).
+Model training is implemented using a standard PyTorch training loop, with configurable options:
+
+- Optimizer (`Adam`, `AdamW`, `RMSProp`)
+- Learning rate (`lr`)
+- L2 regularization (`weight_decay`)
+- Dropout
+- Gradient clipping (`grad_clip`)
+- Loss function type: `MSE`, `MAE`, `Huber`
+
+---
+
+## Features
+
+- Simple and fast-to-train architecture.
+- Suitable for small-time series.
+- Support for regional embeddings.
+- Easily integrates with automated hyperparameter tuning procedures (e.g., Optuna).
 
 ---

@@ -1,62 +1,62 @@
 # ARGRUForecaster
 
-## Описание
+## Description
 
-**ARGRUForecaster** — это рекуррентная нейронная сеть на базе GRU с механизмом внимания (attention) для предсказания инвестиционных показателей по регионам России на несколько лет вперёд.  
-Модель работает как авто-регрессивная (AR), используя прошлые значения временного ряда для прогнозирования будущих. Также поддерживаются региональные эмбеддинги и различные типы внимания.
-
----
-
-## Архитектура
-
-Основные компоненты модели:
-
-- **Входные данные**:  
-  Входной тензор `x` имеет размер `[batch_size, seq_len, n_features]`, где:
-  - `seq_len` — длина временного окна (количество прошлых шагов для анализа),
-  - `n_features` — количество признаков на каждый шаг.
-
-- **Региональные эмбеддинги (опционально)**:  
-  Если `region_emb_size > 0`, используется слой `nn.Embedding` для кодирования регионов в вектор фиксированной размерности.  
-  Эти эмбеддинги конкатенируются с временными признаками перед подачей в GRU.
-
-- **Проекция входа (опционально)**:  
-  Слой `nn.Linear` может использоваться для уменьшения размерности входных данных перед подачей в энкодер.
-
-- **Энкодер (GRU)**:  
-  Многослойный GRU, который обрабатывает последовательность входных данных и формирует контекстный вектор `enc_ctx`.  
-  Пуллинг контекста осуществляется конкатенацией последнего скрытого состояния и среднего по временной оси.
-
-- **Декодер (GRU)**:  
-  Декодер получает предыдущие предсказания и скрытые состояния для генерации следующего шага.  
-  Поддерживается возможность teacher forcing для обучения с известными целевыми значениями.
-
-- **Механизм внимания**:  
-  Используется dot-product или scaled dot-product внимание для взвешивания выходов энкодера при генерации каждого шага декодера.  
-  Веса внимания могут подвергаться Dropout.
-
-- **Выходной слой**:  
-  Линейный слой объединяет выход декодера и контекст из энкодера для предсказания одного временного шага.
-
-- **Инициализация весов**:  
-  - Линейные слои: Xavier Uniform  
-  - GRU: weight_ih — Xavier, weight_hh — ортогональная (с fallback на Xavier), bias — нули
+**ARGRUForecaster** is a recurrent neural network based on GRU with an attention mechanism for forecasting investment indicators across regions of Russia several years ahead.  
+The model operates in an autoregressive (AR) manner, using past-time series values to predict future ones. Regional embeddings and multiple attention types are also supported.
 
 ---
 
-## Использование
+## Architecture
 
-Пример создания модели и проверки количества параметров:
+Main components of the model:
+
+- **Input data**:  
+  The input tensor `x` has shape `[batch_size, seq_len, n_features]`, where:
+  - `seq_len` — length of the time window (number of past steps to analyze),
+  - `n_features` — number of features at each step.
+
+- **Regional embeddings (optional)**:  
+  If `region_emb_size > 0`, an `nn.Embedding` layer is used to encode regions into fixed-size vectors.  
+  These embeddings are concatenated with temporal features before being fed into the GRU.
+
+- **Input projection (optional)**:  
+  An `nn.Linear` layer can be used to reduce input dimensionality before passing data to the encoder.
+
+- **Encoder (GRU)**:  
+  A multi-layer GRU processes the input sequence and forms a context vector `enc_ctx`.  
+  Context pooling is performed by concatenating the last hidden state and the mean over the temporal axis.
+
+- **Decoder (GRU)**:  
+  The decoder receives previous predictions and hidden states to generate the next step.  
+  Teacher forcing is supported for training with known target values.
+
+- **Attention mechanism**:  
+  Dot-product or scaled dot-product attention is used to weight encoder outputs when generating each decoder step.  
+  Attention weights can be regularized with Dropout.
+
+- **Output layer**:  
+  A linear layer combines the decoder output and the encoder context to predict a single time step.
+
+- **Weight initialization**:  
+  - Linear layers: Xavier Uniform  
+  - GRU: `weight_ih` — Xavier, `weight_hh` — orthogonal (with fallback to Xavier), bias — zeros
+
+---
+
+## Usage
+
+Example of creating the model and checking the number of parameters:
 
 ```python
 import torch
 from torch import nn
 
-# Создание модели
+# Create model
 test_model = ARGRUForecaster(n_features=78, horizon=3)
 print(test_model)
 
-# Подсчет параметров
+# Count parameters
 total_params = sum(p.numel() for p in test_model.parameters())
 trainable_params = sum(p.numel() for p in test_model.parameters() if p.requires_grad)
 
@@ -65,45 +65,45 @@ print(f"Trainable parameters: {trainable_params}")
 ```
 ---
 
-## Основные гиперпараметры
+## Main Hyperparameters
 
-| Параметр | Описание |
-|----------|----------|
-| `n_features` | Количество признаков на шаг |
-| `horizon` | Количество шагов для предсказания |
-| `encoder_hidden` | Размер скрытого состояния энкодера |
-| `decoder_hidden` | Размер скрытого состояния декодера (если None, используется encoder_hidden) |
-| `num_layers` | Количество слоев в энкодере и декодере |
-| `dropout` | Доля отключаемых нейронов внутри GRU |
-| `input_proj_dim` | Размерность проекции входа (опционально) |
-| `region_emb_size` | Размер регионального эмбеддинга |
-| `attention_type` | Тип внимания: `"dot"` или `"scaled_dot"` |
-| `attention_dropout` | Dropout для весов внимания |
-| `input_noise_std` | Стандартное отклонение гауссовского шума на входе для регуляризации |
-
----
-
-## Обучение
-
-Обучение модели реализуется стандартным циклом PyTorch с возможностью настройки:
-
-- Оптимизаторы: `Adam`, `AdamW`, `RMSProp`
-- Темп обучения (`lr`) и L2-регуляризация (`weight_decay`)
-- Dropout внутри GRU и на выходе декодера
-- Усечение градиентов (`grad_clip`)
-- Тип функции потерь: `MSE`, `MAE`, `Huber`
-- Teacher forcing с заданной вероятностью (`teacher_forcing_prob`)
-- Поддержка LR scheduler: `StepLR` или `CosineAnnealingLR`
+| Parameter | Description |
+|----------|-------------|
+| `n_features` | Number of features per time step |
+| `horizon` | Number of steps to forecast |
+| `encoder_hidden` | Encoder hidden state size |
+| `decoder_hidden` | Decoder hidden state size (if None, uses `encoder_hidden`) |
+| `num_layers` | Number of layers in encoder and decoder |
+| `dropout` | Dropout rate inside GRU |
+| `input_proj_dim` | Input projection dimensionality (optional) |
+| `region_emb_size` | Regional embedding size |
+| `attention_type` | Attention type: `"dot"` or `"scaled_dot"` |
+| `attention_dropout` | Dropout for attention weights |
+| `input_noise_std` | Standard deviation of Gaussian input noise for regularization |
 
 ---
 
-## Особенности
+## Training
 
-- GRU с вниманием позволяет учитывать длинные временные зависимости.
-- Поддержка авто-регрессивного режима для генерации последовательностей.
-- Опциональные региональные эмбеддинги позволяют модели учитывать особенности каждого региона.
-- Гибкая настройка декодера и энкодера.
-- Совместимость с автоматизированным поиском гиперпараметров (Optuna).
-- Поддержка регуляризации входного шума для улучшения обобщения.
+Model training is implemented using a standard PyTorch training loop with configurable options:
+
+- Optimizers: `Adam`, `AdamW`, `RMSProp`
+- Learning rate (`lr`) and L2 regularization (`weight_decay`)
+- Dropout inside GRU and on decoder outputs
+- Gradient clipping (`grad_clip`)
+- Loss functions: `MSE`, `MAE`, `Huber`
+- Teacher forcing with a given probability (`teacher_forcing_prob`)
+- LR scheduler support: `StepLR` or `CosineAnnealingLR`
+
+---
+
+## Features
+
+- GRU with attention allows modeling long-term temporal dependencies.
+- Supports auto-regressive mode for sequence generation.
+- Optional regional embeddings enable the model to capture region-specific characteristics.
+- Flexible encoder and decoder configuration.
+- Compatible with automated hyperparameter search (Optuna).
+- Supports input noise regularization to improve generalization.
 
 ---
