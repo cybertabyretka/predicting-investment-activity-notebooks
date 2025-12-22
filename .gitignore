@@ -13,15 +13,19 @@ Data
 
 Notebooks/GRU
 !Notebooks/GRU/russian-investment-activity-gru.ipynb
+!Notebooks/GRU/README.md
 
 Notebooks/LSTM
 !Notebooks/LSTM/russian-investment-activity-lstm.ipynb
+!Notebooks/LSTM/README.md
 
 Notebooks/FeedforwardMLP
 !Notebooks/FeedforwardMLP/russian-investment-activity-mlp.ipynb
+!Notebooks/FeedforwardMLP/README.md
 
 Notebooks/Transformer
 !Notebooks/Transformer/russian-investment-activity-transformer.ipynb
+!Notebooks/Transformer/README.md
 
 Notebooks/Predict
 !Notebooks/Predict/Tuning.ipynb
